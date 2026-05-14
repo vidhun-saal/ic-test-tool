@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { XapiStatement } from '../../../electron/shared/types';
+import { JsonView } from './JsonView';
 
 interface Props {
   statements: XapiStatement[];
@@ -129,8 +130,8 @@ export function StatementList({ statements }: Props) {
                 </span>
               </div>
               {isOpen && (
-                <div className="row-expanded">
-                  <pre>{JSON.stringify(s, null, 2)}</pre>
+                <div className="row-expanded" onClick={(e) => e.stopPropagation()}>
+                  <JsonView value={s} defaultExpandDepth={3} stringCollapse={500} maxHeight={480} />
                 </div>
               )}
             </div>

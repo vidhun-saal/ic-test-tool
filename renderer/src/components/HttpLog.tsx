@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { HttpLogEntry } from '../../../electron/shared/types';
+import { JsonView } from './JsonView';
 
 interface Props {
   entries: HttpLogEntry[];
@@ -23,15 +24,6 @@ function statusClass(status: number): string {
   if (status >= 300) return 's3';
   if (status >= 200) return 's2';
   return '';
-}
-
-function tryFormatJson(s?: string): string {
-  if (!s) return '';
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2);
-  } catch {
-    return s;
-  }
 }
 
 export function HttpLog({ entries }: Props) {
@@ -103,19 +95,19 @@ export function HttpLog({ entries }: Props) {
                 </span>
               </div>
               {isOpen && (
-                <div className="row-expanded">
+                <div className="row-expanded" onClick={(ev) => ev.stopPropagation()}>
                   <div className="row-section">Request headers</div>
-                  <pre>{JSON.stringify(e.requestHeaders, null, 2)}</pre>
+                  <JsonView value={e.requestHeaders} maxHeight={220} />
                   {e.requestBody && (
                     <>
                       <div className="row-section">Request body</div>
-                      <pre>{tryFormatJson(e.requestBody)}</pre>
+                      <JsonView text={e.requestBody} maxHeight={360} />
                     </>
                   )}
                   {e.responseBody && (
                     <>
                       <div className="row-section">Response body</div>
-                      <pre>{tryFormatJson(e.responseBody)}</pre>
+                      <JsonView text={e.responseBody} maxHeight={360} />
                     </>
                   )}
                 </div>
