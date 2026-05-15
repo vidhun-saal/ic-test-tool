@@ -82,17 +82,17 @@ export function TpInvalidSummary({ entries, approvedCodes }: Props) {
   const showIssueCol = approvedCodes !== null;
 
   return (
-    <div className="tp-summary" role="alert">
+    <div className="tp-summary tp-summary-warn" role="alert">
       <button
         type="button"
         className="tp-summary-bar"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
+        <span className="tp-summary-pill">{invalid.length}</span>
         <span className="tp-summary-icon" aria-hidden="true">!</span>
         <span className="tp-summary-text">
-          <strong>{invalid.length}</strong> Teaching Point{' '}
-          {invalid.length === 1 ? 'issue' : 'issues'} in this package:{' '}
+          Teaching Point {invalid.length === 1 ? 'issue' : 'issues'} in this package —{' '}
           {bannerText(invalid, approvedCodes)}
         </span>
         <span className="tp-summary-toggle" aria-hidden="true">

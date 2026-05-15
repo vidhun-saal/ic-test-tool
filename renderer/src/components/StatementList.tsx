@@ -179,39 +179,71 @@ export function StatementList({ statements, approvedCodes }: Props) {
           const verbClass = verb.toLowerCase().replace(/\s+/g, '-');
           const hasIssue = d.issue !== null;
           const label = statementObjectLabel(d);
-          const rowClass =
-            d.issue === 'unknown'
-              ? 'tp-invalid tp-unknown'
+          const codeTrim = d.tp?.code?.trim() ?? '';
+          const isTpValidatedOk =
+            approvedCodes !== null &&
+            d.tp !== null &&
+            d.tp.ok &&
+            codeTrim.length > 0 &&
+            approvedCodes.has(codeTrim) &&
+            !hasIssue;
+
+          const issueChip =
+            hasIssue && d.issue ? (
+              <span
+                className={`tp-issue-chip tp-issue-chip-${d.issue}`}
+                title={rowReasonText(d)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                !
+              </span>
+            ) : null;
+          const validChip = isTpValidatedOk ? (
+            <span
+              className="tp-valid-chip"
+              title={`"${codeTrim}" is in the approved list`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              ✓
+            </span>
+          ) : null;
+
+          const rowAccentClass = hasIssue
+            ? d.issue === 'unknown'
+              ? 'row-issue-unknown'
               : d.issue === 'format'
-                ? 'tp-invalid'
-                : '';
+                ? 'row-issue-format'
+                : ''
+            : isTpValidatedOk
+              ? 'row-issue-valid'
+              : '';
+
+          const labelClass = hasIssue
+            ? 'tp-label-bad'
+            : isTpValidatedOk
+              ? 'tp-label-ok'
+              : undefined;
           return (
             <div
               key={d.s.id}
-              className={`statement-row ${isOpen ? 'open' : ''} ${rowClass}`}
+              className={`statement-row ${isOpen ? 'open' : ''} ${rowAccentClass}`}
               onClick={() => setOpenId(isOpen ? null : (d.s.id ?? null))}
             >
               <div className="row-summary">
                 <span className="row-time">{formatTime(d.s.stored ?? d.s.timestamp)}</span>
                 <span className={`verb-pill ${verbClass}`}>{verb}</span>
+                {issueChip}
+                {validChip}
                 <span className="row-detail" title={label}>
                   <span style={{ color: 'var(--text-dim)' }}>{actorName(d.s.actor)}</span>
                   {label && (
                     <>
                       <span style={{ color: 'var(--text-muted)' }}> → </span>
-                      <span className={hasIssue ? 'tp-label-bad' : undefined}>{label}</span>
+                      <span className={labelClass}>{label}</span>
                     </>
                   )}
                 </span>
               </div>
-              {hasIssue && (
-                <div
-                  className={`tp-row-reason ${d.issue === 'unknown' ? 'tp-row-reason-unknown' : ''}`}
-                >
-                  <span className="tp-row-reason-icon" aria-hidden="true">!</span>
-                  {rowReasonText(d)}
-                </div>
-              )}
               {isOpen && (
                 <div className="row-expanded" onClick={(e) => e.stopPropagation()}>
                   <JsonView value={d.s} defaultExpandDepth={3} stringCollapse={500} maxHeight={480} />

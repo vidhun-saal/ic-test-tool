@@ -3,14 +3,13 @@ import type { Ctp, KeycloakStatus } from '../../../electron/shared/types';
 import { computeCodesFromTeachingPoints } from '../../../electron/shared/tpE2Format';
 import { lms } from '../lib/ipc';
 import type { ApprovedCodesState } from './TpApprovedLoader';
-import {
-  SearchableSelect,
-  type SearchableOption,
-} from './SearchableSelect';
+import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 interface Props {
   onChange: (value: ApprovedCodesState | null) => void;
   value: ApprovedCodesState | null;
+  /** Increment to expand the package picker (e.g. when parent opens "Change source"). */
+  pickerFocusRevision?: number;
 }
 
 type SyncStatus =
@@ -40,14 +39,20 @@ function formatExpiry(iso: string | undefined): string {
   });
 }
 
-export function TpApiSync({ onChange, value }: Props) {
+export function TpApiSync({ onChange, value, pickerFocusRevision = 0 }: Props) {
   const [kc, setKc] = useState<KeycloakStatus | null>(null);
   const [status, setStatus] = useState<SyncStatus>({ kind: 'idle' });
   const [ctpList, setCtpList] = useState<Ctp[]>([]);
   const [ctpId, setCtpId] = useState('');
   const [busy, setBusy] = useState<'ctps' | 'sync' | 'login' | null>(null);
-  const [showCodes, setShowCodes] = useState(false);
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  /** After a successful sync, hide picker behind a one-line summary until user expands. */
+  const [pickerExpanded, setPickerExpanded] = useState(true);
+
+  useEffect(() => {
+    if (pickerFocusRevision > 0) {
+      setPickerExpanded(true);
+    }
+  }, [pickerFocusRevision]);
 
   const refreshCtps = useCallback(async () => {
     setStatus({ kind: 'idle' });
@@ -77,6 +82,7 @@ export function TpApiSync({ onChange, value }: Props) {
         setCtpList([]);
         setCtpId('');
         setStatus({ kind: 'idle' });
+        setPickerExpanded(true);
       }
     });
     return off;
@@ -93,6 +99,7 @@ export function TpApiSync({ onChange, value }: Props) {
         }
         return;
       }
+      setPickerExpanded(true);
       await refreshCtps();
     } finally {
       setBusy(null);
@@ -104,6 +111,7 @@ export function TpApiSync({ onChange, value }: Props) {
     setCtpList([]);
     setCtpId('');
     setStatus({ kind: 'idle' });
+    setPickerExpanded(true);
     if (value?.source === 'api') {
       onChange(null);
     }
@@ -129,6 +137,9 @@ export function TpApiSync({ onChange, value }: Props) {
           ? { kind: 'empty', ctpName }
           : { kind: 'success', codes: codes.length, skipped, ctpName },
       );
+      if (codes.length > 0) {
+        setPickerExpanded(false);
+      }
     } catch (e) {
       setStatus({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -151,21 +162,14 @@ export function TpApiSync({ onChange, value }: Props) {
     [ctpList],
   );
 
-  const sortedSyncedCodes = useMemo<string[]>(() => {
-    if (!value || value.source !== 'api') return [];
-    return Array.from(value.codes).sort((a, b) => a.localeCompare(b));
-  }, [value]);
+  const showFullPicker =
+    !loggedIn ||
+    status.kind === 'idle' ||
+    status.kind === 'empty' ||
+    status.kind === 'error' ||
+    pickerExpanded;
 
-  const handleCopyCodes = async () => {
-    try {
-      await navigator.clipboard.writeText(sortedSyncedCodes.join('\n'));
-      setCopyState('copied');
-      window.setTimeout(() => setCopyState('idle'), 1500);
-    } catch {
-      setCopyState('error');
-      window.setTimeout(() => setCopyState('idle'), 2000);
-    }
-  };
+  const compactAfterSuccess = status.kind === 'success' && !pickerExpanded;
 
   if (!loggedIn) {
     return (
@@ -198,136 +202,142 @@ export function TpApiSync({ onChange, value }: Props) {
 
   return (
     <div className="tp-api-sync">
-      <div className="tp-api-conn">
-        <span className="tp-api-conn-dot" aria-hidden />
-        <span className="tp-api-conn-text">
-          Connected as <strong>{username ?? 'user'}</strong>
-          {expiryAt && (
-            <span className="tp-api-conn-expiry" title={`Token expires at ${expiryAt}`}>
-              {' · '}token until {expiryAt}
+      {compactAfterSuccess && (
+        <div className="tp-api-compact" role="region" aria-label="API sync">
+          <span className="tp-api-compact-text">
+            Connected as <strong>{username ?? 'user'}</strong>
+            {expiryAt && (
+              <span className="tp-api-conn-expiry" title={`Token until ${expiryAt}`}>
+                {' · '}token {expiryAt}
+              </span>
+            )}
+            <span className="tp-api-compact-meta">
+              {' · '}
+              {ctpList.length.toLocaleString()} packages
             </span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="tp-api-link"
-          onClick={() => void handleLogout()}
-          disabled={!!busy}
-        >
-          Sign out
-        </button>
-      </div>
-
-      {ctpList.length === 0 && busy !== 'ctps' ? (
-        <div className="tp-api-empty">
-          <div className="tp-api-empty-text">
-            No curriculum topic packages available for this account.
-          </div>
-          <button
-            type="button"
-            className="tp-api-link"
-            onClick={() => void refreshCtps()}
-            disabled={!!busy}
-          >
-            Try again
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="tp-api-picker">
-            <SearchableSelect
-              options={ctpOptions}
-              value={ctpId}
-              onChange={setCtpId}
-              disabled={!!busy || ctpList.length === 0}
-              placeholder={
-                busy === 'ctps' && ctpList.length === 0
-                  ? 'Loading packages…'
-                  : 'Search by code, name, or version…'
-              }
-              ariaLabel="Curriculum topic package"
-              emptyMessage="No matching packages"
-            />
+          </span>
+          <span className="tp-api-compact-actions">
             <button
               type="button"
-              className="primary"
+              className="ghost"
               disabled={!!busy || !ctpId.trim()}
               onClick={() => void handleSync()}
             >
-              {busy === 'sync' ? 'Syncing…' : 'Sync'}
+              {busy === 'sync' ? 'Syncing…' : 'Re-sync'}
             </button>
-          </div>
-
-          <div className="tp-api-actions">
-            <span className="tp-api-actions-meta">
-              {ctpList.length.toLocaleString()} packages
-            </span>
             <button
               type="button"
               className="tp-api-link"
-              onClick={() => void refreshCtps()}
+              onClick={() => setPickerExpanded(true)}
               disabled={!!busy}
             >
-              {busy === 'ctps' ? 'Refreshing…' : 'Refresh package list'}
+              Switch package
             </button>
-          </div>
-        </>
+            <button
+              type="button"
+              className="tp-api-link"
+              onClick={() => void handleLogout()}
+              disabled={!!busy}
+            >
+              Sign out
+            </button>
+          </span>
+        </div>
       )}
 
-      {status.kind === 'success' && (
+      {showFullPicker && (
         <>
-          <div className="tp-api-status tp-api-status-ok" role="status">
-            <span className="tp-api-status-icon" aria-hidden>✓</span>
-            <span className="tp-api-status-text">
-              Synced <strong>{status.codes.toLocaleString()}</strong> codes from{' '}
-              <strong>{status.ctpName}</strong>
-              {status.skipped > 0 && (
-                <span className="tp-api-status-meta">
-                  {' · '}
-                  {status.skipped} row{status.skipped === 1 ? '' : 's'} skipped (missing order fields)
+          <div className="tp-api-conn">
+            <span className="tp-api-conn-dot" aria-hidden />
+            <span className="tp-api-conn-text">
+              Connected as <strong>{username ?? 'user'}</strong>
+              {expiryAt && (
+                <span className="tp-api-conn-expiry" title={`Token expires at ${expiryAt}`}>
+                  {' · '}token until {expiryAt}
                 </span>
               )}
             </span>
             <button
               type="button"
               className="tp-api-link"
-              onClick={() => setShowCodes((v) => !v)}
-              aria-expanded={showCodes}
+              onClick={() => void handleLogout()}
+              disabled={!!busy}
             >
-              {showCodes ? 'Hide codes' : 'View codes'}
+              Sign out
             </button>
           </div>
 
-          {showCodes && sortedSyncedCodes.length > 0 && (
-            <div className="tp-api-codes" role="region" aria-label="Synced teaching point codes">
-              <div className="tp-api-codes-head">
-                <span className="tp-api-codes-title">
-                  {sortedSyncedCodes.length.toLocaleString()} teaching-point code
-                  {sortedSyncedCodes.length === 1 ? '' : 's'}
+          {ctpList.length === 0 && busy !== 'ctps' ? (
+            <div className="tp-api-empty">
+              <div className="tp-api-empty-text">
+                No curriculum topic packages available for this account.
+              </div>
+              <button
+                type="button"
+                className="tp-api-link"
+                onClick={() => void refreshCtps()}
+                disabled={!!busy}
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="tp-api-picker">
+                <SearchableSelect
+                  options={ctpOptions}
+                  value={ctpId}
+                  onChange={setCtpId}
+                  disabled={!!busy || ctpList.length === 0}
+                  placeholder={
+                    busy === 'ctps' && ctpList.length === 0
+                      ? 'Loading packages…'
+                      : 'Search by code, name, or version…'
+                  }
+                  ariaLabel="Curriculum topic package"
+                  emptyMessage="No matching packages"
+                />
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!!busy || !ctpId.trim()}
+                  onClick={() => void handleSync()}
+                >
+                  {busy === 'sync' ? 'Syncing…' : 'Sync'}
+                </button>
+              </div>
+
+              <div className="tp-api-actions">
+                <span className="tp-api-actions-meta">
+                  {ctpList.length.toLocaleString()} packages
                 </span>
                 <button
                   type="button"
-                  className="ghost tp-api-codes-copy"
-                  onClick={() => void handleCopyCodes()}
-                  title="Copy all codes to clipboard"
+                  className="tp-api-link"
+                  onClick={() => void refreshCtps()}
+                  disabled={!!busy}
                 >
-                  {copyState === 'copied'
-                    ? '✓ Copied'
-                    : copyState === 'error'
-                      ? 'Copy failed'
-                      : 'Copy all'}
+                  {busy === 'ctps' ? 'Refreshing…' : 'Refresh package list'}
                 </button>
               </div>
-              <div className="tp-api-codes-grid" role="list">
-                {sortedSyncedCodes.map((c) => (
-                  <code key={c} role="listitem" className="tp-api-code-chip" title={c}>
-                    {c}
-                  </code>
-                ))}
-              </div>
-            </div>
+            </>
           )}
         </>
+      )}
+
+      {status.kind === 'success' && showFullPicker && (
+        <div className="tp-api-status tp-api-status-ok" role="status">
+          <span className="tp-api-status-icon" aria-hidden>✓</span>
+          <span className="tp-api-status-text">
+            Synced <strong>{status.codes.toLocaleString()}</strong> from <strong>{status.ctpName}</strong>
+            {status.skipped > 0 && (
+              <span className="tp-api-status-meta">
+                {' · '}
+                {status.skipped} row{status.skipped === 1 ? '' : 's'} skipped (missing order fields)
+              </span>
+            )}
+          </span>
+        </div>
       )}
 
       {status.kind === 'empty' && (
@@ -336,8 +346,8 @@ export function TpApiSync({ onChange, value }: Props) {
           <span>
             <strong>{status.ctpName}</strong> returned no usable teaching-point codes.
             <span className="tp-api-status-meta">
-              {' '}This package may not have any teaching points yet, or rows are missing the required
-              order fields.
+              {' '}
+              This package may not have teaching points yet, or rows are missing order fields.
             </span>
           </span>
         </div>
