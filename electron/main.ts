@@ -1,5 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.join(process.cwd(), '.env') });
+
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import os from 'os';
 import { promises as fs } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +16,19 @@ import {
   type LaunchConfig,
   type TpEntry,
   type UploadResult,
+  type Ctp,
+  type TeachingPointRow,
+  type KeycloakStatus,
 } from './shared/types';
+import { loadApiConfigFromEnv, setApiConfig } from './server/config';
+import { loginInteractive, KeycloakLoginCancelled } from './server/keycloakAuth';
+import {
+  setTokens,
+  clearTokens,
+  getKeycloakStatus,
+  setTokenStatusNotifier,
+} from './server/tokenStore';
+import { listCtps, listTeachingPoints } from './server/e2Api';
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL'];
 const TEMP_BASE = path.join(os.tmpdir(), 'lms-tester');
@@ -129,6 +144,47 @@ function registerIpc(): void {
       }
     },
   );
+
+  ipcMain.handle(IPC.KC_LOGIN, async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!mainWindow) {
+      return { ok: false, error: 'Main window unavailable' };
+    }
+    try {
+      console.log('[KC] login starting…');
+      const tokens = await loginInteractive(mainWindow);
+      setTokens(tokens);
+      console.log('[KC] login OK, token expires in', tokens.expiresInSeconds, 's');
+      return { ok: true };
+    } catch (e) {
+      if (e instanceof KeycloakLoginCancelled) {
+        console.log('[KC] login cancelled by user');
+        return { ok: false, error: 'cancelled' };
+      }
+      console.error('[KC] login error:', e instanceof Error ? e.message : e);
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  });
+
+  ipcMain.handle(IPC.KC_LOGOUT, () => {
+    clearTokens();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC.KC_STATUS, (): KeycloakStatus => getKeycloakStatus());
+
+  ipcMain.handle(IPC.LIST_CTPS, async (): Promise<Ctp[]> => {
+    return await listCtps();
+  });
+
+  ipcMain.handle(
+    IPC.LIST_TEACHING_POINTS,
+    async (_e, ctpId: string): Promise<TeachingPointRow[]> => {
+      return await listTeachingPoints(ctpId);
+    },
+  );
 }
 
 function wireStoreToRenderer(): void {
@@ -155,12 +211,25 @@ async function shutdown(): Promise<void> {
   }
 }
 
+function broadcastKcStatus(): void {
+  const s = getKeycloakStatus();
+  mainWindow?.webContents.send(IPC.KC_STATUS_EVENT, s);
+}
+
 app.whenReady().then(async () => {
+  try {
+    setApiConfig(loadApiConfigFromEnv(process.env));
+    setTokenStatusNotifier(broadcastKcStatus);
+  } catch (e) {
+    console.warn('API config:', e instanceof Error ? e.message : String(e));
+  }
+
   const baseDir = await ensureBaseDir();
   serverHandle = await startServer(baseDir);
   registerIpc();
   wireStoreToRenderer();
   await createWindow();
+  broadcastKcStatus();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

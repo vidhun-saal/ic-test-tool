@@ -2,8 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC,
   type AppState,
+  type Ctp,
   type HttpLogEntry,
+  type KeycloakStatus,
   type ServerInfo,
+  type TeachingPointRow,
   type TpEntry,
   type UploadResult,
   type XapiStatement,
@@ -38,6 +41,23 @@ const api = {
     const handler = (_e: unknown, entries: TpEntry[]) => cb(entries);
     ipcRenderer.on(IPC.TP_INVENTORY_EVENT, handler);
     return () => ipcRenderer.removeListener(IPC.TP_INVENTORY_EVENT, handler);
+  },
+
+  kcLogin: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.KC_LOGIN),
+
+  kcLogout: (): Promise<{ ok: true }> => ipcRenderer.invoke(IPC.KC_LOGOUT),
+
+  kcStatus: (): Promise<KeycloakStatus> => ipcRenderer.invoke(IPC.KC_STATUS),
+
+  listCtps: (): Promise<Ctp[]> => ipcRenderer.invoke(IPC.LIST_CTPS),
+
+  listTeachingPoints: (ctpId: string): Promise<TeachingPointRow[]> =>
+    ipcRenderer.invoke(IPC.LIST_TEACHING_POINTS, ctpId),
+
+  onKcStatus: (cb: (status: KeycloakStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: KeycloakStatus) => cb(status);
+    ipcRenderer.on(IPC.KC_STATUS_EVENT, handler);
+    return () => ipcRenderer.removeListener(IPC.KC_STATUS_EVENT, handler);
   },
 };
 

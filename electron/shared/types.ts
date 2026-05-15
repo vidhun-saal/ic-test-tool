@@ -97,6 +97,35 @@ export interface ScannedTpHit {
   line?: number;
 }
 
+export type KeycloakStatus =
+  | { state: 'logged-out' }
+  | {
+      state: 'logged-in';
+      username?: string;
+      /** ISO expiry of access token */
+      expiresAt: string;
+    };
+
+export interface Ctp {
+  id: string;
+  /** Resolved display name (BASE name if this CTP is non-BASE and has a parent) */
+  name: string;
+  code?: string;
+  abbreviation?: string;
+  type?: string;
+  /** Parent BASE CTP id (for non-BASE CTPs) */
+  parentCtpId?: string;
+  /** Version inherited from the parent BASE CTP (when available) */
+  version?: string | number;
+}
+
+export interface TeachingPointRow {
+  toOrder?: number;
+  eoOrder?: number;
+  order?: number;
+  [key: string]: unknown;
+}
+
 export const IPC = {
   GET_SERVER_INFO: 'lms:getServerInfo',
   UPLOAD_ZIP: 'lms:uploadZip',
@@ -106,6 +135,12 @@ export const IPC = {
   STATEMENT_EVENT: 'lms:statement',
   HTTP_EVENT: 'lms:http',
   TP_INVENTORY_EVENT: 'lms:tpInventory',
+  KC_LOGIN: 'lms:kcLogin',
+  KC_LOGOUT: 'lms:kcLogout',
+  KC_STATUS: 'lms:kcStatus',
+  LIST_CTPS: 'lms:listCtps',
+  LIST_TEACHING_POINTS: 'lms:listTeachingPoints',
+  KC_STATUS_EVENT: 'lms:kcStatusEvent',
 } as const;
 
 export interface AppState {
