@@ -5,11 +5,13 @@ import { promises as fs } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { startServer, type ServerHandle } from './server';
 import { extractZip, cleanupBaseDir } from './server/content';
+import { scanPackage } from './server/scanner';
 import { store } from './server/store';
 import {
   IPC,
   type AppState,
   type LaunchConfig,
+  type TpEntry,
   type UploadResult,
 } from './shared/types';
 
@@ -82,6 +84,7 @@ function registerIpc(): void {
       package: store.getPackage(),
       statements: store.getStatements(),
       httpLog: store.getHttpLog(),
+      tpInventory: store.getTpInventory(),
     };
   });
 
@@ -111,6 +114,11 @@ function registerIpc(): void {
         const originalName = path.basename(filePath);
         const pkg = await extractZip(filePath, serverHandle.baseDir, originalName);
         store.setPackage(pkg);
+        const pkgRoot = path.join(serverHandle.baseDir, pkg.id);
+        const hits = await scanPackage(pkgRoot);
+        for (const h of hits) {
+          store.upsertTpEntry({ raw: h.raw, source: 'static', file: h.file });
+        }
         const activityId = `http://localhost/activities/${pkg.id}`;
         return { ok: true, package: pkg, defaultLaunch: defaultLaunchConfig(activityId) };
       } catch (err) {
@@ -129,6 +137,9 @@ function wireStoreToRenderer(): void {
   });
   store.on('http', (h) => {
     mainWindow?.webContents.send(IPC.HTTP_EVENT, h);
+  });
+  store.on('tp', (entries: TpEntry[]) => {
+    mainWindow?.webContents.send(IPC.TP_INVENTORY_EVENT, entries);
   });
 }
 

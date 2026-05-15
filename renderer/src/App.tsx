@@ -5,11 +5,17 @@ import { LaunchToolbar } from './components/LaunchToolbar';
 import { ContentFrame } from './components/ContentFrame';
 import { StatementList } from './components/StatementList';
 import { HttpLog } from './components/HttpLog';
+import { TpInvalidSummary } from './components/TpInvalidSummary';
+import {
+  TpApprovedLoader,
+  type ApprovedCodesState,
+} from './components/TpApprovedLoader';
 import type {
   HttpLogEntry,
   LaunchConfig,
   PackageInfo,
   ServerInfo,
+  TpEntry,
   UploadResult,
   XapiStatement,
 } from '../../electron/shared/types';
@@ -37,9 +43,11 @@ export default function App() {
   const [launchConfig, setLaunchConfig] = useState<LaunchConfig | null>(null);
   const [statements, setStatements] = useState<XapiStatement[]>([]);
   const [httpLog, setHttpLog] = useState<HttpLogEntry[]>([]);
+  const [tpInventory, setTpInventory] = useState<TpEntry[]>([]);
   const [tab, setTab] = useState<Tab>('statements');
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [approved, setApproved] = useState<ApprovedCodesState | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -48,6 +56,7 @@ export default function App() {
       setPkg(state.package);
       setStatements(state.statements);
       setHttpLog(state.httpLog);
+      setTpInventory(state.tpInventory);
     })();
 
     const offStatement = lms.onStatement((s) => {
@@ -56,9 +65,13 @@ export default function App() {
     const offHttp = lms.onHttp((h) => {
       setHttpLog((prev) => [h, ...prev].slice(0, 500));
     });
+    const offTp = lms.onTpInventory((entries) => {
+      setTpInventory(entries);
+    });
     return () => {
       offStatement();
       offHttp();
+      offTp();
     };
   }, []);
 
@@ -66,6 +79,13 @@ export default function App() {
     if (!serverInfo || !pkg || !launchConfig) return null;
     return buildLaunchUrl(serverInfo, pkg, launchConfig);
   }, [serverInfo, pkg, launchConfig, reloadKey]);
+
+  const tpInventoryForBanner = useMemo(
+    () => (pkg ? tpInventory : []),
+    [pkg, tpInventory],
+  );
+
+  const approvedCodes = approved?.codes ?? null;
 
   const onUploaded = useCallback((result: UploadResult) => {
     if (result.ok && result.package && result.defaultLaunch) {
@@ -109,6 +129,9 @@ export default function App() {
         </div>
       </header>
 
+      <TpApprovedLoader value={approved} onChange={setApproved} />
+      <TpInvalidSummary entries={tpInventoryForBanner} approvedCodes={approvedCodes} />
+
       {error && <div className="notice">{error}</div>}
 
       <div className="app-body">
@@ -149,7 +172,7 @@ export default function App() {
           </div>
           <div className="right-pane-body">
             {tab === 'statements' ? (
-              <StatementList statements={statements} />
+              <StatementList statements={statements} approvedCodes={approvedCodes} />
             ) : (
               <HttpLog entries={httpLog} />
             )}

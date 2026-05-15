@@ -2,6 +2,7 @@ import type {
   AppState,
   HttpLogEntry,
   ServerInfo,
+  TpEntry,
   UploadResult,
   XapiStatement,
 } from '../../../electron/shared/types';
@@ -14,6 +15,7 @@ export interface LmsApi {
   uploadZip(filePath: string): Promise<UploadResult>;
   onStatement(cb: (s: XapiStatement) => void): () => void;
   onHttp(cb: (h: HttpLogEntry) => void): () => void;
+  onTpInventory(cb: (entries: TpEntry[]) => void): () => void;
 }
 
 declare global {

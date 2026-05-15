@@ -4,6 +4,7 @@ import {
   type AppState,
   type HttpLogEntry,
   type ServerInfo,
+  type TpEntry,
   type UploadResult,
   type XapiStatement,
 } from './shared/types';
@@ -31,6 +32,12 @@ const api = {
     const handler = (_e: unknown, h: HttpLogEntry) => cb(h);
     ipcRenderer.on(IPC.HTTP_EVENT, handler);
     return () => ipcRenderer.removeListener(IPC.HTTP_EVENT, handler);
+  },
+
+  onTpInventory: (cb: (entries: TpEntry[]) => void): (() => void) => {
+    const handler = (_e: unknown, entries: TpEntry[]) => cb(entries);
+    ipcRenderer.on(IPC.TP_INVENTORY_EVENT, handler);
+    return () => ipcRenderer.removeListener(IPC.TP_INVENTORY_EVENT, handler);
   },
 };
 

@@ -78,6 +78,25 @@ export interface UploadResult {
   error?: string;
 }
 
+export type TpSource = 'static' | 'live';
+
+export interface TpEntry {
+  raw: string;
+  code?: string;
+  name?: string;
+  formatOk: boolean;
+  formatReason?: string;
+  sources: TpSource[];
+  files?: string[];
+  statementIds?: string[];
+}
+
+export interface ScannedTpHit {
+  raw: string;
+  file: string;
+  line?: number;
+}
+
 export const IPC = {
   GET_SERVER_INFO: 'lms:getServerInfo',
   UPLOAD_ZIP: 'lms:uploadZip',
@@ -86,6 +105,7 @@ export const IPC = {
   CLEAR_LOG: 'lms:clearLog',
   STATEMENT_EVENT: 'lms:statement',
   HTTP_EVENT: 'lms:http',
+  TP_INVENTORY_EVENT: 'lms:tpInventory',
 } as const;
 
 export interface AppState {
@@ -93,4 +113,5 @@ export interface AppState {
   package: PackageInfo | null;
   statements: XapiStatement[];
   httpLog: HttpLogEntry[];
+  tpInventory: TpEntry[];
 }
