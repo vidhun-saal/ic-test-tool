@@ -15,6 +15,9 @@ interface ThemeProviderProps {
 }
 
 function getSystemTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined' || !window.matchMedia) {
+    return 'light';
+  }
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -45,6 +48,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
+    
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       setSystemTheme(e.matches ? 'dark' : 'light');
