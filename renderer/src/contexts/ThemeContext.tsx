@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
+/**
+ * Theme options available to the user
+ */
 type Theme = 'light' | 'dark' | 'system';
 
+/**
+ * Theme context interface providing theme state and controls
+ */
 interface ThemeContextType {
+  /** Current user-selected theme preference */
   theme: Theme;
+  /** Function to update the theme preference */
   setTheme: (theme: Theme) => void;
+  /** The actual resolved theme (light or dark) after system preference resolution */
   resolvedTheme: 'light' | 'dark';
 }
 

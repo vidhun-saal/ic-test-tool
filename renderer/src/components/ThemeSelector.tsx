@@ -23,6 +23,7 @@ export function ThemeSelector({ className }: ThemeSelectorProps) {
         value={theme}
         onChange={handleThemeChange}
         className="theme-selector"
+        aria-label="Select application theme"
       >
         <option value="system">System</option>
         <option value="light">Light</option>
