@@ -16,13 +16,13 @@ export function ThemeSelector({ className }: ThemeSelectorProps) {
   };
 
   return (
-    <div className={className}>
-      <label htmlFor="theme-selector">Theme</label>
+    <div className={`theme-selector ${className || ''}`}>
+      <label htmlFor="theme-selector" className="theme-label">Theme</label>
       <select
         id="theme-selector"
         value={theme}
         onChange={handleThemeChange}
-        className="theme-selector"
+        className="theme-select"
       >
         <option value="system">System</option>
         <option value="light">Light</option>

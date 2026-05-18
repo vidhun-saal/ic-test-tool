@@ -10,6 +10,8 @@ import {
   TpApprovedLoader,
   type ApprovedCodesState,
 } from './components/TpApprovedLoader';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { SettingsPanel, SettingsButton } from './components/SettingsPanel';
 import type {
   HttpLogEntry,
   LaunchConfig,
@@ -37,7 +39,7 @@ function buildLaunchUrl(
   return `${base}?${params.toString()}`;
 }
 
-export default function App() {
+function AppContent() {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [pkg, setPkg] = useState<PackageInfo | null>(null);
   const [launchConfig, setLaunchConfig] = useState<LaunchConfig | null>(null);
@@ -48,6 +50,7 @@ export default function App() {
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState<ApprovedCodesState | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -117,6 +120,14 @@ export default function App() {
     setReloadKey((k) => k + 1);
   }, []);
 
+  const handleOpenSettings = useCallback(() => {
+    setIsSettingsOpen(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
@@ -124,8 +135,11 @@ export default function App() {
           <span className={`brand-dot ${serverInfo ? '' : 'idle'}`} />
           <h1>xAPI LMS Tester</h1>
         </div>
-        <div className="meta">
-          {serverInfo ? `LRS · ${serverInfo.baseUrl}/xapi/` : 'Starting…'}
+        <div className="header-actions">
+          <div className="meta">
+            {serverInfo ? `LRS · ${serverInfo.baseUrl}/xapi/` : 'Starting…'}
+          </div>
+          <SettingsButton onClick={handleOpenSettings} />
         </div>
       </header>
 
@@ -179,6 +193,16 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <SettingsPanel isOpen={isSettingsOpen} onClose={handleCloseSettings} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
